@@ -1,0 +1,221 @@
+---
+title: "Analisis Data Menggunakan R"
+author: "Yulia Candra Dewi"
+date: "1/12/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Penjualan Produk Amazon Terbaik Berdasarkan Rating dan Jumlah Ulasan
+
+## Latar Belakang Dataset
+
+Amazon adalah perusahaan teknologi multinasional Amerika yang berbasis di Seattle, Washington, yang berfokus pada e-commerce, komputasi awan, streaming digital, dan kecerdasan buatan. Perusahaan ini awalnya merupakan pasar online untuk buku, tetapi kemudian diperluas untuk menjual barang elektronik, perangkat lunak, video game, pakaian, furnitur, makanan, mainan, dan perhiasan.Saat ini Amazon menjadi perusahaan swasta terbesar kedua di Amerika Serikat dan salah satu perusahaan paling bernilai di dunia.
+
+Dataset Amazon Best Seller June 2021 Products ini menyajikan kategori produk yang dijual oleh Amazon, kemudian kode unik produk, link produk, jumlah penjual disetiap kategori produk, peringkat produk, rating produk, jumlah ulasan, dan harga produk.
+
+Dataset ini dibuat untuk membantu perusahan menemukan produk dengan penjualan terbaik (Best Seller) pada Juni 2021. Oleh karena itu, kali ini saya akan mencoba melakukan EDA, Data Preparation, dan Data visualization untuk menemukan penjualan terbaik Rating dan Jumlah Ulasan.
+
+### Pertannyaan Analisis
+
+1. Kategori produk mana yang mempunyai Rating paling tinggi dan paling rendah dilihat dari rata-ratanya?
+
+2. Kategori produk mana yang mendapatkan Jumlah Ulasan (Reviews Count) paling banyak dan paling sedikit dilihat dari rata-ratanya?
+
+3. Kategori produk mana yang mempunyai harga (Price) paling mahal dan paling murah dilihat dari rata-ratanya?
+
+### Import Library
+
+```{r}
+library(heatmaply)
+library(visdat)
+library(tidyverse)
+library(skimr)
+library(DataExplorer)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
+library(tibble)
+library(reshape2)
+library(psych)
+```
+
+### Mengakses Dataset
+
+```{r}
+df <- read.csv("~/RStudio PSDS/Amazon_Best_Seller_2021_June.csv", stringsAsFactors=TRUE)
+head(df)
+```
+
+### Memahami Data
+
+1. **ASIN** = Kode unik produk
+2. **Category** = Kategori produk
+3. **Product Link** = Link produk
+4. **No of Sellers** = Jumlah penjual di setiap daftar produk
+5. **Rank** = Peringkat produk
+6. **Rating** = Rating produk
+7. **Reviews Count** = Jumlah total ulasan pada suatu produk
+8. **Price** = Harga produk
+
+## EDA (Exploratory Data Analysis)
+
+### Dimensi Data
+
+```{r}
+dim(df)
+```
+
+### Variabel Pada Dataset
+
+```{r}
+names(df)
+str(df)
+```
+
+### Memperbarui data dengan mengubah tipe data agar tidak terjadi error saat Plot Distribusi Data Numerik dan Pairplot
+
+```{r}
+# Mengubah tipe data yang ada pada kolom 'No of Sellers' dari character menjadi numeric, dengan menghapus kata ' Sellers'
+df$No.of.Sellers <- as.numeric(gsub(" Sellers","",df$No.of.Sellers))
+# Mengubah tipe data yang ada pada kolom 'Rank' dari character menjadi numeric, dengan menghapus simbol '#'
+df$Rank <- as.numeric(gsub("#","",df$Rank))
+# Mengubah tipe data yang ada pada kolom 'Reviews Count' dari character menjadi numeric, dengan menghapus tanda koma ','
+df$Reviews.Count <- as.numeric(gsub(",", "", df$Reviews.Count))
+# Mengubah tipe data yang ada pada kolom 'Price' dari character menjadi numeric, dengan menghapus simbol '$'
+df$Price <- (as.numeric(gsub("[^[:alnum:]]","",df$Price)))/100
+head(df)
+```
+
+### Mengecek informasi data yang telah diperbarui
+
+```{r}
+str(df)
+```
+
+### Mengecek missing data yang telah diperbarui
+
+```{r}
+sapply(df, function(x) sum(is.na(x)))
+vis_miss(df)
+```
+
+### Mengecek Outlier
+
+```{r}
+num_cols <- unlist(lapply(df, is.numeric))
+df_num <- df[ , num_cols]  
+boxplot(df_num)
+```
+
+### Melihat Korelasi Data
+
+```{r}
+plot_correlation(df_num)
+```
+
+### Melihat Statistik Data
+
+```{r}
+summary(df)
+```
+
+### Plot Distribusi Data Numerik
+
+```{r}
+d <- melt(df_num)
+ggplot(d,aes(x = value)) + 
+    facet_wrap(~variable,scales = "free_x") + geom_histogram()
+```
+
+### Pairplot
+
+```{r}
+pairs.panels(df_num, 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+```
+
+## Data Preparation
+
+**Membuat data frame untuk visualisasi yang akan menjawab pertanyaan pertama**
+
+```{r}
+x <- group_by(df, Category)
+x <- summarize(x, Rating = mean(Rating, na.rm = TRUE ))
+x
+```
+
+**Membuat data frame untuk visualisasi yang akan menjawab pertanyaan kedua**
+
+```{r}
+y <- group_by(df, Category)
+y <- summarize(y, Reviews.Count = mean(Reviews.Count, na.rm = TRUE ))
+y
+```
+
+
+**Membuat data frame untuk visualisasi yang akan menjawab pertanyaan ketiga**
+
+```{r}
+z <- group_by(df, Category)
+z <- summarize(z, Price = mean(Price, na.rm = TRUE ))
+z
+```
+
+## Data Visualization
+
+**1. Kategori produk mana yang mempunyai Rating paling tinggi dan paling rendah dilihat dari rata-ratanya?**
+
+```{r}
+A <- plot_ly(
+     x = x$Category,     
+     y = x$Rating,
+     type = "bar"
+)
+A <- A %>% layout(title = "Rata-Rata Rating Setiap Kategori",
+                         xaxis = list(title = "Category"),
+                         yaxis = list (title = "Rating"))
+A
+```
+
+Dilihat dari rata-ratanya, Rating paling tinggi didapatkan oleh kategori Kartu Hadiah (Gift Card), sedangkan paling rendah didapatkan oleh kategori Kamera & Foto (Camera & Photo).
+
+**2. Kategori produk mana yang mendapatkan Jumlah Ulasan (Reviews Count) paling banyak dan paling sedikit dilihat dari rata-ratanya?**
+
+```{r}
+B <- plot_ly(
+     x = y$Category,     
+     y = y$Reviews.Count,
+     type = "bar"
+)
+B <- B %>% layout(title = "Rata-Rata Jumlah Ulasan Setiap Kategori",
+                         xaxis = list(title = "Category"),
+                         yaxis = list (title = "Reviews Count"))
+B
+```
+
+Dilihat dari rata-ratanya, Jumlah Ulasan paling banyak diterima oleh Kartu Hadiah (Gift Card), sedangkan Jumlah Ulasan paling sedikit diterima oleh Kamera & Foto (Camera & Photo).
+
+**3. Kategori produk mana yang mempunyai harga (Price) paling mahal dan paling murah dilihat dari rata-ratanya?**
+
+```{r}
+C <- plot_ly(
+  x = z$Category,     
+  y = z$Price,
+  type = "bar"
+)
+C <- C %>% layout(title = "Rata-Rata Harga Setiap Kategori",
+                          xaxis = list(title = "Category"),
+                          yaxis = list (title = "Price"))
+C
+```
+
+Dilihat dari rata-ratanya, Harga paling mahal adalah kategori elektronik (Electronics), sedangkan Harga paling murah adalah Buku (Books).
